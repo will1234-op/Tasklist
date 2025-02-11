@@ -12,7 +12,6 @@ export interface Task {
   createdAt: string
   updatedAt: string
   dueDate?: string
-  completedAt?: string
 }
 
 export interface Column {

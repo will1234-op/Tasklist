@@ -74,3 +74,62 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom styles for the task board */
+.task-board {
+  @apply flex gap-4 p-4 overflow-x-auto min-h-[calc(100vh-4rem)];
+}
+
+.task-list {
+  @apply flex-shrink-0 w-80 bg-card rounded-lg border shadow-sm;
+}
+
+.task-list-header {
+  @apply p-3 border-b flex items-center justify-between;
+}
+
+.task-list-content {
+  @apply p-2 flex flex-col gap-2 h-[calc(100vh-12rem)] overflow-y-auto;
+}
+
+.task-card {
+  @apply bg-card rounded-md border shadow-sm cursor-move hover:shadow-md transition-all;
+}
+
+.task-card-dragging {
+  @apply opacity-50 rotate-2 scale-105;
+}
+
+.task-card-content {
+  @apply p-3 space-y-3;
+}
+
+.task-form {
+  @apply p-3 bg-card rounded-md border space-y-3;
+}
+
+/* Custom scrollbar styles */
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Webkit scrollbar styles */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-muted-foreground/20 hover:bg-muted-foreground/30;
+  }
+}

@@ -48,23 +48,30 @@ export function TaskColumn({
       <div
         ref={drop}
         className={cn(
-          'flex flex-col gap-4 p-4 bg-muted/50 rounded-lg min-h-[500px]',
+          'flex flex-col bg-muted/50 rounded-lg border border-border shadow-sm',
           isOver && 'ring-2 ring-primary'
         )}
       >
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">{title}</h2>
-          {allowNewTasks && (
-            <button
-              className="text-sm px-2 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={() => setIsNewTaskDialogOpen(true)}
-            >
-              + New
-            </button>
-          )}
+        <div className="p-4 border-b border-border">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-lg">{title}</h2>
+              <span className="text-sm text-muted-foreground">
+                {tasks.length}
+              </span>
+            </div>
+            {allowNewTasks && (
+              <button
+                onClick={() => setIsNewTaskDialogOpen(true)}
+                className="text-sm px-2 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                + New
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="p-4 flex flex-col gap-3 min-h-[calc(100vh-16rem)]">
           {tasks.map((task) => (
             <TaskCard
               key={task.id}
@@ -72,6 +79,11 @@ export function TaskColumn({
               onDelete={onDeleteTask}
             />
           ))}
+          {tasks.length === 0 && (
+            <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
+              No tasks
+            </div>
+          )}
         </div>
       </div>
 
