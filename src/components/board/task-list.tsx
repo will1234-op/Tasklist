@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useDrop } from 'react-dnd'
-import { Task } from '@/types'
+import { Task, TaskStatus } from '@/types'
 import { TaskCard } from './task-card'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -10,9 +10,9 @@ import { Textarea } from '@/components/ui/textarea'
 interface TaskListProps {
   title: string
   tasks: Task[]
-  status: Task['status']
+  status: TaskStatus
   allowNewTasks?: boolean
-  onTaskDrop?: (taskId: string, newStatus: Task['status']) => void
+  onTaskDrop?: (taskId: string, newStatus: TaskStatus) => void
   onDeleteTask?: (taskId: string) => void
   onCreateTask?: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => void
 }
@@ -30,9 +30,11 @@ export function TaskList({
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
+    status: status,
+    priority: 'medium' as const,
     category: '',
-    priority: 'medium' as Task['priority'],
     dueDate: '',
+    completed: false,
   })
 
   const [{ isOver }, drop] = useDrop(() => ({
@@ -50,123 +52,103 @@ export function TaskList({
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault()
     if (onCreateTask) {
-      onCreateTask({
-        ...newTask,
-        status,
+      onCreateTask(newTask)
+      setShowNewTaskForm(false)
+      setNewTask({
+        title: '',
+        description: '',
+        status: status,
+        priority: 'medium',
+        category: '',
+        dueDate: '',
+        completed: false,
       })
     }
-    setNewTask({
-      title: '',
-      description: '',
-      category: '',
-      priority: 'medium',
-      dueDate: '',
-    })
-    setShowNewTaskForm(false)
   }
 
   return (
     <div
       ref={drop}
       className={cn(
-        'w-80 shrink-0 select-none rounded-lg border bg-card',
+        'flex w-80 shrink-0 flex-col rounded-lg bg-muted/50 p-2',
         isOver && 'ring-2 ring-primary'
       )}
     >
-      <div className="p-3 border-b">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-sm">{title}</h2>
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-muted px-2 text-xs text-muted-foreground">
-              {tasks.length}
-            </span>
-          </div>
-          {allowNewTasks && !showNewTaskForm && (
-            <Button
-              onClick={() => setShowNewTaskForm(true)}
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2"
-            >
-              Add
-            </Button>
-          )}
-        </div>
+      <div className="flex items-center justify-between p-2">
+        <h3 className="font-medium">{title}</h3>
+        <span className="text-sm text-muted-foreground">{tasks.length}</span>
       </div>
-
-      <div className="h-[calc(100vh-10rem)] overflow-y-auto p-2">
-        <div className="space-y-2">
-          {showNewTaskForm && (
-            <form onSubmit={handleCreateTask} className="rounded-lg border bg-card p-3 shadow-sm">
-              <div className="space-y-2">
-                <Input
-                  type="text"
-                  value={newTask.title}
-                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                  placeholder="Task title"
-                  className="h-8 text-sm"
-                  required
-                />
-                <Textarea
-                  value={newTask.description}
-                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                  placeholder="Description"
-                  className="h-20 resize-none text-sm"
-                />
-                <Input
-                  type="text"
-                  value={newTask.category}
-                  onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
-                  placeholder="Category"
-                  className="h-8 text-sm"
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={newTask.priority}
-                    onChange={(e) =>
-                      setNewTask({ ...newTask, priority: e.target.value as Task['priority'] })
-                    }
-                    className="h-8 w-full rounded-md border bg-background px-2 text-sm"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                  </select>
-                  <Input
-                    type="date"
-                    value={newTask.dueDate}
-                    onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                    className="h-8 text-sm"
-                  />
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  onClick={() => setShowNewTaskForm(false)}
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-3"
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" className="h-7 px-3">
-                  Add task
-                </Button>
-              </div>
-            </form>
-          )}
-
-          {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onDelete={onDeleteTask} />
-          ))}
-
-          {tasks.length === 0 && !showNewTaskForm && (
-            <div className="flex h-20 items-center justify-center rounded-lg border-2 border-dashed text-sm text-muted-foreground">
-              No tasks
+      <div className="flex-1 space-y-2 p-2">
+        {tasks.map((task) => (
+          <TaskCard key={task.id} task={task} onDelete={onDeleteTask} />
+        ))}
+        {showNewTaskForm ? (
+          <form onSubmit={handleCreateTask} className="space-y-2">
+            <Input
+              placeholder="Task title"
+              value={newTask.title}
+              onChange={(e) =>
+                setNewTask((prev) => ({ ...prev, title: e.target.value }))
+              }
+              required
+            />
+            <Textarea
+              placeholder="Description"
+              value={newTask.description}
+              onChange={(e) =>
+                setNewTask((prev) => ({ ...prev, description: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Category"
+              value={newTask.category}
+              onChange={(e) =>
+                setNewTask((prev) => ({ ...prev, category: e.target.value }))
+              }
+            />
+            <select
+              value={newTask.priority}
+              onChange={(e) =>
+                setNewTask((prev) => ({
+                  ...prev,
+                  priority: e.target.value as Task['priority'],
+                }))
+              }
+              className="w-full rounded-md border bg-background px-3 py-2"
+            >
+              <option value="low">Low Priority</option>
+              <option value="medium">Medium Priority</option>
+              <option value="high">High Priority</option>
+            </select>
+            <Input
+              type="date"
+              value={newTask.dueDate}
+              onChange={(e) =>
+                setNewTask((prev) => ({ ...prev, dueDate: e.target.value }))
+              }
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowNewTaskForm(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Add Task</Button>
             </div>
-          )}
-        </div>
+          </form>
+        ) : (
+          allowNewTasks && (
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
+              onClick={() => setShowNewTaskForm(true)}
+            >
+              + Add Task
+            </Button>
+          )
+        )}
       </div>
     </div>
   )

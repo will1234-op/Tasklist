@@ -4,7 +4,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend'
 import { Task } from '@/types'
 import { TaskList } from './task-list'
 import { useAuth } from '@/contexts/auth-context'
-import { createTask, updateTask, deleteTask, subscribeToTasks } from '@/lib/tasks'
+import { createTask, updateTask, deleteTask, subscribeToTasks, listUserTasks } from '@/lib/tasks'
 
 export function Board() {
   const { user } = useAuth()
@@ -22,7 +22,20 @@ export function Board() {
 
   const handleCreateTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) return
-    await createTask(user.uid, task)
+    try {
+      const taskId = await createTask(user.uid, task)
+      console.log('Task created with ID:', taskId)
+      // List all tasks to verify
+      const tasks = await listUserTasks(user.uid)
+      console.log('Current tasks in database:', tasks)
+    } catch (error) {
+      console.error('Error in handleCreateTask:', error)
+    }
+  }
+
+  const handleUpdateTask = async (taskId: string, updates: Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>) => {
+    if (!user) return
+    await updateTask(user.uid, taskId, updates)
   }
 
   const handleDeleteTask = async (taskId: string) => {
@@ -34,7 +47,7 @@ export function Board() {
     if (!user) return
     const task = tasks.find((t) => t.id === taskId)
     if (!task) return
-    await updateTask(user.uid, taskId, { ...task, status: newStatus })
+    await handleUpdateTask(taskId, { status: newStatus })
   }
 
   const getTasksByStatus = (status: Task['status']) => {

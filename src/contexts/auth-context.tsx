@@ -11,6 +11,7 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type User,
+  browserPopupRedirectResolver,
 } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 
@@ -37,11 +38,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider()
     try {
-      await signInWithPopup(auth, provider)
-    } catch (error) {
+      const provider = new GoogleAuthProvider()
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      })
+      await signInWithPopup(auth, provider, browserPopupRedirectResolver)
+    } catch (error: any) {
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.log('Sign-in popup was closed by the user')
+        return
+      }
       console.error('Error signing in with Google:', error)
+      throw error
     }
   }
 
@@ -50,18 +59,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await firebaseSignOut(auth)
     } catch (error) {
       console.error('Error signing out:', error)
+      throw error
     }
   }
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        signInWithGoogle,
-        signOut,
-      }}
-    >
+    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   )
