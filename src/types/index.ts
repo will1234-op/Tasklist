@@ -6,17 +6,21 @@ export interface Task {
   id: string
   title: string
   description: string
-  priority: 'low' | 'medium' | 'high'
-  status: 'todo' | 'in-progress' | 'review' | 'completed'
-  category: string
-  createdAt: string
-  updatedAt: string
+  status: string
+  position: number
+  priority: boolean
+  createdAt: Date
+  updatedAt: Date
+  comments: Comment[]
+  activityLog: ActivityLogItem[]
   dueDate?: string
 }
 
+export type TaskStatus = string
+
 export interface Column {
   id: string
-  title: string
+  name: string
   tasks: Task[]
   allowNewTasks: boolean
 }
@@ -38,4 +42,12 @@ export interface CategoryTag {
   id: string
   name: string
   color: string
+}
+
+export interface Board {
+  id: string
+  name: string
+  columns: Column[]
+  createdAt: Date
+  updatedAt: Date
 }

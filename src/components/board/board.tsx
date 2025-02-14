@@ -1,97 +1,207 @@
-import { useState, useEffect } from 'react'
-import { DndProvider } from 'react-dnd'
-import { HTML5Backend } from 'react-dnd-html5-backend'
-import { Task } from '@/types'
+import { useCallback, useEffect, useState } from 'react'
+import { Task, TaskStatus, Column } from '@/types'
 import { TaskList } from './task-list'
+import { DragDropContext, DropResult } from '@hello-pangea/dnd'
 import { useAuth } from '@/contexts/auth-context'
-import { createTask, updateTask, deleteTask, subscribeToTasks, listUserTasks } from '@/lib/tasks'
+import {
+  onTasksSnapshot,
+  createTask,
+  updateTask,
+  deleteTask,
+  addComment,
+} from '@/lib/tasks'
+import {
+  onColumnsSnapshot,
+  createColumn,
+  updateColumn,
+  deleteColumn,
+  initializeDefaultColumns,
+} from '@/lib/columns'
+import { Button } from '@/components/ui/button'
+import { Plus } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { ColumnHeader } from './column-header'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 
 export function Board() {
-  const { user } = useAuth()
   const [tasks, setTasks] = useState<Task[]>([])
+  const [columns, setColumns] = useState<Column[]>([])
+  const [showNewColumn, setShowNewColumn] = useState(false)
+  const [newColumnName, setNewColumnName] = useState('')
+  const { user } = useAuth()
 
   useEffect(() => {
     if (!user) return
 
-    const unsubscribe = subscribeToTasks(user.uid, (newTasks) => {
-      setTasks(newTasks)
+    const initializeBoard = async () => {
+      try {
+        await initializeDefaultColumns()
+      } catch (error) {
+        console.error('Error initializing board:', error)
+      }
+    }
+
+    initializeBoard()
+
+    const unsubscribeTasks = onTasksSnapshot((tasks) => {
+      setTasks(tasks)
     })
 
-    return () => unsubscribe()
+    const unsubscribeColumns = onColumnsSnapshot((columns) => {
+      setColumns(columns)
+    })
+
+    return () => {
+      unsubscribeTasks()
+      unsubscribeColumns()
+    }
   }, [user])
 
-  const handleCreateTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (!user) return
-    try {
-      const taskId = await createTask(user.uid, task)
-      console.log('Task created with ID:', taskId)
-      // List all tasks to verify
-      const tasks = await listUserTasks(user.uid)
-      console.log('Current tasks in database:', tasks)
-    } catch (error) {
-      console.error('Error in handleCreateTask:', error)
+  const handleDragEnd = useCallback(
+    async (result: DropResult) => {
+      if (!result.destination) return
+
+      const { source, destination, draggableId } = result
+
+      // If task hasn't moved, do nothing
+      if (
+        source.droppableId === destination.droppableId &&
+        source.index === destination.index
+      ) {
+        return
+      }
+
+      // Get all tasks in the source and destination lists
+      const sourceTasks = tasks.filter((task) => task.status === source.droppableId)
+      const destTasks = tasks.filter((task) => task.status === destination.droppableId)
+
+      // Calculate new position
+      let newPosition: number
+      if (destTasks.length === 0) {
+        // If the destination list is empty
+        newPosition = 1000
+      } else if (destination.index === 0) {
+        // If moving to the start of a list
+        newPosition = destTasks[0].position - 1000
+      } else if (destination.index >= destTasks.length) {
+        // If moving to the end of a list
+        newPosition = destTasks[destTasks.length - 1].position + 1000
+      } else {
+        // If moving between two tasks
+        const before = destTasks[destination.index - 1].position
+        const after = destTasks[destination.index].position
+        newPosition = Math.floor((before + after) / 2)
+      }
+
+      // Update the task with new status and position
+      await updateTask(draggableId, {
+        status: destination.droppableId,
+        position: newPosition,
+      })
+    },
+    [tasks]
+  )
+
+  const handleCreateTask = useCallback(async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'activityLog' | 'position'>) => {
+    const tasksInList = tasks.filter((t) => t.status === task.status)
+    const position = tasksInList.length > 0
+      ? tasksInList[tasksInList.length - 1].position + 1000
+      : 1000
+
+    await createTask({ ...task, position, status: task.status })
+  }, [tasks])
+
+  const handleUpdateTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
+    await updateTask(taskId, updates)
+  }, [])
+
+  const handleDeleteTask = useCallback(async (taskId: string) => {
+    await deleteTask(taskId)
+  }, [])
+
+  const handleAddComment = useCallback(async (taskId: string, content: string) => {
+    await addComment(taskId, content)
+  }, [])
+
+  const handleCreateColumn = async () => {
+    if (!newColumnName.trim()) return
+    await createColumn(newColumnName.trim())
+    setNewColumnName('')
+    setShowNewColumn(false)
+  }
+
+  const handleUpdateColumn = async (columnId: string, name: string) => {
+    await updateColumn(columnId, { name })
+  }
+
+  const handleDeleteColumn = async (columnId: string) => {
+    // Only delete if there are no tasks in the column
+    const tasksInColumn = tasks.filter((task) => task.status === columnId)
+    if (tasksInColumn.length === 0) {
+      await deleteColumn(columnId)
+    } else {
+      // TODO: Show error message that column must be empty
+      console.error('Cannot delete column with tasks')
     }
   }
 
-  const handleUpdateTask = async (taskId: string, updates: Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>) => {
-    if (!user) return
-    await updateTask(user.uid, taskId, updates)
-  }
-
-  const handleDeleteTask = async (taskId: string) => {
-    if (!user) return
-    await deleteTask(user.uid, taskId)
-  }
-
-  const handleTaskDrop = async (taskId: string, newStatus: Task['status']) => {
-    if (!user) return
-    const task = tasks.find((t) => t.id === taskId)
-    if (!task) return
-    await handleUpdateTask(taskId, { status: newStatus })
-  }
-
-  const getTasksByStatus = (status: Task['status']) => {
-    return tasks.filter((task) => task.status === status)
-  }
-
   return (
-    <DndProvider backend={HTML5Backend}>
-      <div className="h-[calc(100vh-3.5rem)] p-6 overflow-x-auto">
-        <div className="flex gap-4 min-w-max">
-          <TaskList
-            title="To Do"
-            tasks={getTasksByStatus('todo')}
-            status="todo"
-            onTaskDrop={handleTaskDrop}
-            onDeleteTask={handleDeleteTask}
-            onCreateTask={handleCreateTask}
-          />
-          <TaskList
-            title="In Progress"
-            tasks={getTasksByStatus('in-progress')}
-            status="in-progress"
-            onTaskDrop={handleTaskDrop}
-            onDeleteTask={handleDeleteTask}
-            onCreateTask={handleCreateTask}
-          />
-          <TaskList
-            title="Review"
-            tasks={getTasksByStatus('review')}
-            status="review"
-            onTaskDrop={handleTaskDrop}
-            onDeleteTask={handleDeleteTask}
-            onCreateTask={handleCreateTask}
-          />
-          <TaskList
-            title="Done"
-            tasks={getTasksByStatus('done')}
-            status="done"
-            onTaskDrop={handleTaskDrop}
-            onDeleteTask={handleDeleteTask}
-            onCreateTask={handleCreateTask}
-          />
+    <DragDropContext onDragEnd={handleDragEnd}>
+      <div className="flex h-full flex-col gap-4 p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Task Board</h2>
+          <Dialog open={showNewColumn} onOpenChange={setShowNewColumn}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Column
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Column</DialogTitle>
+              </DialogHeader>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <Input
+                    value={newColumnName}
+                    onChange={(e) => setNewColumnName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleCreateColumn()
+                      }
+                    }}
+                    placeholder="Column name"
+                  />
+                </div>
+                <Button onClick={handleCreateColumn}>Add Column</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+        <div className="grid auto-cols-[300px] grid-flow-col gap-4 overflow-auto">
+          {columns.map((column) => (
+            <div key={column.id} className="flex flex-col rounded-lg bg-muted/50 p-4">
+              <ColumnHeader
+                title={column.name}
+                onRename={(name) => handleUpdateColumn(column.id, name)}
+                onDelete={() => handleDeleteColumn(column.id)}
+                allowDelete={tasks.filter((task) => task.status === column.id).length === 0}
+              />
+              <TaskList
+                title={column.name}
+                tasks={tasks.filter((task) => task.status === column.id)}
+                status={column.id}
+                columnName={column.name}
+                onCreateTask={handleCreateTask}
+                onUpdateTask={handleUpdateTask}
+                onDeleteTask={handleDeleteTask}
+                onAddComment={handleAddComment}
+              />
+            </div>
+          ))}
         </div>
       </div>
-    </DndProvider>
+    </DragDropContext>
   )
 }
