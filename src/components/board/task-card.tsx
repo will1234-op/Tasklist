@@ -16,10 +16,9 @@ interface TaskCardProps {
   onDelete?: (taskId: string) => void
   onUpdate?: (taskId: string, updates: Partial<Task>) => void
   onAddComment?: (taskId: string, content: string) => void
-  columnName: string
 }
 
-export function TaskCard({ task, index, onDelete, onUpdate, onAddComment, columnName }: TaskCardProps) {
+export function TaskCard({ task, index, onDelete, onUpdate, onAddComment }: TaskCardProps) {
   const [showDetails, setShowDetails] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -43,7 +42,7 @@ export function TaskCard({ task, index, onDelete, onUpdate, onAddComment, column
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    {columnName.toLowerCase() === 'done' && (
+                    {task.status === 'done' && (
                       <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4CAF50]">
                         <Check className="h-4 w-4 text-white stroke-[3]" />
                       </div>
@@ -103,36 +102,40 @@ export function TaskCard({ task, index, onDelete, onUpdate, onAddComment, column
               </div>
             </div>
           </div>
-          <TaskDetailsDialog
-            open={showDetails}
-            onOpenChange={setShowDetails}
-            task={task}
-            onUpdate={onUpdate}
-            onDelete={onDelete}
-            onAddComment={onAddComment}
-          />
-          <TaskDialog
-            open={showEdit}
-            onOpenChange={setShowEdit}
-            task={task}
-            onSave={(updates) => {
-              if (onUpdate) {
-                onUpdate(task.id, updates)
-              }
-            }}
-            onAddComment={onAddComment}
-          />
-          <ConfirmDialog
-            open={showDeleteConfirm}
-            onOpenChange={setShowDeleteConfirm}
-            title="Delete Task"
-            description={`Are you sure you want to delete "${task.title}"? This action cannot be undone.`}
-            onConfirm={() => {
-              if (onDelete) {
-                onDelete(task.id)
-              }
-            }}
-          />
+          {showDetails && (
+            <TaskDetailsDialog
+              task={task}
+              open={showDetails}
+              onOpenChange={setShowDetails}
+              onUpdate={onUpdate}
+              onAddComment={onAddComment}
+            />
+          )}
+          {showEdit && (
+            <TaskDialog
+              task={task}
+              open={showEdit}
+              onOpenChange={setShowEdit}
+              onSave={(updates) => {
+                if (onUpdate) {
+                  onUpdate(task.id, updates)
+                }
+              }}
+            />
+          )}
+          {showDeleteConfirm && (
+            <ConfirmDialog
+              open={showDeleteConfirm}
+              onOpenChange={setShowDeleteConfirm}
+              title="Delete Task"
+              description="Are you sure you want to delete this task? This action cannot be undone."
+              onConfirm={() => {
+                if (onDelete) {
+                  onDelete(task.id)
+                }
+              }}
+            />
+          )}
         </>
       )}
     </Draggable>

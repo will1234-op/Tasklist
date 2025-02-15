@@ -1,85 +1,90 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Droppable } from '@hello-pangea/dnd'
 import { Task, TaskStatus } from '@/types'
 import { TaskCard } from './task-card'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
-import { TaskDialog } from '@/components/task-dialog'
+import { TaskDialog } from '../task-dialog'
 import { cn } from '@/lib/utils'
 
 interface TaskListProps {
-  title: string
-  tasks: Task[]
-  status: TaskStatus
+  columnId: string
   columnName: string
-  onDeleteTask?: (taskId: string) => void
-  onCreateTask?: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'activityLog' | 'position'>) => void
-  onUpdateTask?: (taskId: string, updates: Partial<Task>) => void
-  onAddComment?: (taskId: string, content: string) => void
+  tasks: Task[]
+  onCreateTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'activityLog' | 'position'>) => Promise<void>
+  onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void>
+  onDeleteTask: (taskId: string) => Promise<void>
+  onAddComment: (taskId: string, content: string) => Promise<void>
+}
+
+const columnToStatus: Record<string, TaskStatus> = {
+  'Home': 'home',
+  'To Do': 'todo',
+  'In Progress': 'in-progress',
+  'Done': 'done',
 }
 
 export function TaskList({
-  title,
-  tasks,
-  status,
+  columnId,
   columnName,
-  onDeleteTask,
+  tasks,
   onCreateTask,
   onUpdateTask,
+  onDeleteTask,
   onAddComment,
 }: TaskListProps) {
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showNewTask, setShowNewTask] = useState(false)
 
-  // Sort tasks by position
-  const sortedTasks = [...tasks].sort((a, b) => (a.position || 0) - (b.position || 0))
+  const sortedTasks = useMemo(() => {
+    return [...tasks].sort((a, b) => (a.position || 0) - (b.position || 0))
+  }, [tasks])
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-end pb-4">
+      <div className="mb-2 flex justify-end">
         <Button
           variant="ghost"
           size="icon"
           className="h-8 w-8"
-          onClick={() => setShowCreateDialog(true)}
+          onClick={() => setShowNewTask(true)}
         >
           <Plus className="h-4 w-4" />
           <span className="sr-only">Add task</span>
         </Button>
       </div>
-      <Droppable droppableId={status}>
+      <Droppable droppableId={columnId}>
         {(provided, snapshot) => (
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={cn(
-              'flex-1 rounded-lg transition-colors',
-              snapshot.isDraggingOver ? 'bg-muted/50' : 'bg-transparent'
+              'flex-1 space-y-2 rounded-lg p-2',
+              snapshot.isDraggingOver && 'bg-muted'
             )}
           >
-            <div className="space-y-4 p-1">
-              {sortedTasks.map((task, index) => (
-                <TaskCard
-                  key={task.id}
-                  index={index}
-                  task={task}
-                  columnName={columnName}
-                  onDelete={onDeleteTask}
-                  onUpdate={onUpdateTask}
-                  onAddComment={onAddComment}
-                />
-              ))}
-              {provided.placeholder}
-            </div>
+            {sortedTasks.map((task, index) => (
+              <TaskCard
+                key={task.id}
+                index={index}
+                task={task}
+                onDelete={onDeleteTask}
+                onUpdate={onUpdateTask}
+                onAddComment={onAddComment}
+              />
+            ))}
+            {provided.placeholder}
           </div>
         )}
       </Droppable>
       <TaskDialog
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
-        onSave={(task) => {
-          if (onCreateTask) {
-            onCreateTask({ ...task, status })
-          }
+        open={showNewTask}
+        onOpenChange={setShowNewTask}
+        onSave={async (task) => {
+          await onCreateTask({
+            ...task,
+            status: columnToStatus[columnName] || 'todo',
+          })
+          setShowNewTask(false)
         }}
       />
     </div>

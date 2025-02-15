@@ -12,9 +12,10 @@ import {
   getDoc,
   arrayUnion,
   serverTimestamp,
+  writeBatch,
 } from 'firebase/firestore'
 import { db } from './firebase'
-import { Task, Comment, ActivityLogItem } from '@/types'
+import { Task, Comment, ActivityLogItem, TaskStatus } from '@/types'
 import { auth } from './firebase'
 
 export interface FirestoreTask extends Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'activityLog'> {
@@ -33,6 +34,76 @@ function getTasksCollection() {
   const userId = auth.currentUser?.uid
   if (!userId) throw new Error('User must be logged in')
   return collection(db, `users/${userId}/tasks`)
+}
+
+// Map column names to task statuses
+const columnToStatus: Record<string, TaskStatus> = {
+  'Home': 'home',
+  'To Do': 'todo',
+  'In Progress': 'in-progress',
+  'Done': 'done',
+}
+
+const statusToColumn: Record<TaskStatus, string> = {
+  'home': 'Home',
+  'todo': 'To Do',
+  'in-progress': 'In Progress',
+  'done': 'Done',
+}
+
+// Function to migrate tasks with column IDs to proper statuses
+export async function migrateTaskStatuses(): Promise<void> {
+  const tasksRef = getTasksCollection()
+  const snapshot = await getDocs(tasksRef)
+  const batch = writeBatch(db)
+
+  for (const doc of snapshot.docs) {
+    const task = doc.data() as Task
+    // If the status is a column ID or invalid, update it to the correct status
+    if (!Object.values(columnToStatus).includes(task.status as TaskStatus)) {
+      batch.update(doc.ref, {
+        status: 'home', // Set to home since these were likely in the Home column
+        updatedAt: serverTimestamp(),
+      })
+    }
+  }
+
+  await batch.commit()
+}
+
+// Helper function to safely convert Firestore timestamp to Date
+function convertTimestamp(timestamp: Timestamp | null | undefined): Date {
+  if (!timestamp) return new Date()
+  return timestamp.toDate()
+}
+
+export function onTasksSnapshot(onTasksUpdate: (tasks: Task[]) => void): () => void {
+  const userId = auth.currentUser?.uid
+  if (!userId) throw new Error('User must be logged in')
+
+  const tasksQuery = query(getTasksCollection(), orderBy('position'))
+
+  return onSnapshot(tasksQuery, (snapshot) => {
+    const tasks = snapshot.docs.map((doc) => {
+      const data = doc.data() as FirestoreTask
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: convertTimestamp(data.createdAt),
+        updatedAt: convertTimestamp(data.updatedAt),
+        comments: data.comments?.map((comment) => ({
+          ...comment,
+          createdAt: convertTimestamp(comment.createdAt),
+          updatedAt: convertTimestamp(comment.updatedAt),
+        })) || [],
+        activityLog: data.activityLog?.map((item) => ({
+          ...item,
+          createdAt: convertTimestamp(item.createdAt),
+        })) || [],
+      }
+    })
+    onTasksUpdate(tasks)
+  })
 }
 
 export async function createTask(
@@ -175,33 +246,4 @@ export async function deleteTask(taskId: string): Promise<void> {
     console.error('Error deleting task:', error)
     throw error
   }
-}
-
-export function onTasksSnapshot(onTasksUpdate: (tasks: Task[]) => void): () => void {
-  const userId = auth.currentUser?.uid
-  if (!userId) throw new Error('User must be logged in')
-
-  const tasksQuery = query(getTasksCollection(), orderBy('position'))
-
-  return onSnapshot(tasksQuery, (snapshot) => {
-    const tasks = snapshot.docs.map((doc) => {
-      const data = doc.data() as FirestoreTask
-      return {
-        ...data,
-        id: doc.id,
-        createdAt: data.createdAt.toDate(),
-        updatedAt: data.updatedAt.toDate(),
-        comments: data.comments?.map((comment) => ({
-          ...comment,
-          createdAt: comment.createdAt.toDate(),
-          updatedAt: comment.updatedAt.toDate(),
-        })) || [],
-        activityLog: data.activityLog?.map((item) => ({
-          ...item,
-          createdAt: item.createdAt.toDate(),
-        })) || [],
-      }
-    })
-    onTasksUpdate(tasks)
-  })
 }

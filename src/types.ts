@@ -1,4 +1,4 @@
-export type TaskStatus = 'todo' | 'in-progress' | 'review' | 'done'
+export type TaskStatus = 'home' | 'todo' | 'in-progress' | 'review' | 'done'
 export type TaskPriority = 'low' | 'medium' | 'high'
 
 export interface Comment {
@@ -24,6 +24,14 @@ export interface ActivityLogItem {
   }
 }
 
+export interface Column {
+  id: string
+  name: string
+  position: number
+  createdAt: any
+  updatedAt: any
+}
+
 export interface Task {
   id: string
   title: string
@@ -31,11 +39,11 @@ export interface Task {
   status: TaskStatus
   priority: TaskPriority
   category: string
-  dueDate: string
+  dueDate?: string
   completed: boolean
+  position: number
   createdAt: Date
   updatedAt: Date
   comments: Comment[]
   activityLog: ActivityLogItem[]
-  position: number
 }
