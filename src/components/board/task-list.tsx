@@ -79,11 +79,9 @@ export function TaskList({
       <TaskDialog
         open={showNewTask}
         onOpenChange={setShowNewTask}
+        status={columnToStatus[columnName] || 'todo'}
         onSave={async (task) => {
-          await onCreateTask({
-            ...task,
-            status: columnToStatus[columnName] || 'todo',
-          })
+          await onCreateTask(task)
           setShowNewTask(false)
         }}
       />

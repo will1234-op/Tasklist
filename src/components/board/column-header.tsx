@@ -1,118 +1,123 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { MoreVertical, Pencil, Save, Trash2, X } from 'lucide-react'
+import { MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 
 interface ColumnHeaderProps {
-  title: string
-  onDelete?: () => void
-  onRename?: (newName: string) => void
+  column: Column
+  onUpdate: (name: string) => void
+  onDelete: () => void
   allowDelete?: boolean
 }
 
 export function ColumnHeader({
-  title,
+  column,
+  onUpdate,
   onDelete,
-  onRename,
   allowDelete = true,
 }: ColumnHeaderProps) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [newTitle, setNewTitle] = useState(title)
+  const [showRenameDialog, setShowRenameDialog] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [newTitle, setNewTitle] = useState(column.name || '')
 
-  const handleSave = () => {
-    if (newTitle.trim() && onRename) {
-      onRename(newTitle.trim())
+  // Update newTitle when title prop changes
+  useEffect(() => {
+    setNewTitle(column.name || '')
+  }, [column.name])
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmedTitle = newTitle.trim()
+    if (trimmedTitle && onUpdate && trimmedTitle !== column.name) {
+      onUpdate(trimmedTitle)
     }
-    setIsEditing(false)
+    setShowRenameDialog(false)
   }
 
-  const handleCancel = () => {
-    setNewTitle(title)
-    setIsEditing(false)
+  const handleOpenRename = () => {
+    setShowRenameDialog(true)
   }
 
-  if (isEditing) {
-    return (
-      <div className="flex items-center gap-2">
-        <Input
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleSave()
-            } else if (e.key === 'Escape') {
-              handleCancel()
-            }
-          }}
-          className="h-8"
-          autoFocus
-        />
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handleSave}
-          >
-            <Save className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handleCancel}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    )
+  const handleCloseRename = () => {
+    setShowRenameDialog(false)
+    setNewTitle(column.name) // Reset to current title
   }
 
   return (
     <>
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="font-medium">{title}</h3>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreVertical className="h-4 w-4" />
-              <span className="sr-only">Open menu</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setIsEditing(true)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Rename
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreVertical className="h-4 w-4" />
+            <span className="sr-only">Open menu</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={handleOpenRename}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Rename
+          </DropdownMenuItem>
+          {allowDelete && onDelete && (
+            <DropdownMenuItem
+              className="text-red-600 focus:text-red-600"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
             </DropdownMenuItem>
-            {allowDelete && onDelete && (
-              <DropdownMenuItem
-                className="text-red-600 focus:text-red-600"
-                onClick={() => setShowDeleteConfirm(true)}
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Dialog open={showRenameDialog} onOpenChange={handleCloseRename}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Column</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSave}>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Input
+                  id="name"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="Enter column name"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCloseRename}
               >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+                Cancel
+              </Button>
+              <Button type="submit">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={showDeleteConfirm}
         onOpenChange={setShowDeleteConfirm}
         title="Delete Column"
-        description={`Are you sure you want to delete the "${title}" column? This will also delete all tasks in this column. This action cannot be undone.`}
-        onConfirm={onDelete}
+        description="Are you sure you want to delete this column? This action cannot be undone."
+        onConfirm={() => {
+          onDelete?.()
+          setShowDeleteConfirm(false)
+        }}
       />
     </>
   )

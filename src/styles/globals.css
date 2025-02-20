@@ -108,6 +108,11 @@
   @apply p-3 bg-card rounded-md border space-y-3;
 }
 
+.drop-shadow-glow {
+  filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.5))
+         drop-shadow(0 0 30px rgba(250, 204, 21, 0.3));
+}
+
 /* Custom scrollbar styles */
 @layer utilities {
   .scrollbar-hide::-webkit-scrollbar {

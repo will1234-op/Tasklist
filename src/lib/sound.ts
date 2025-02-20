@@ -16,21 +16,6 @@ const soundFiles = {
   ]
 }
 
-// Function to get list of sound files from a directory
-function getSoundFiles(isPriority: boolean): string[] {
-  try {
-    const folder = isPriority ? 'Priority' : 'General'
-    const soundsDir = `sounds/${folder}`
-    
-    // Get all sound files
-    const files = import.meta.globEager(`../${soundsDir}/*.{mp3,wav,ogg}`)
-    return Object.keys(files).map(file => file.replace('../', ''))
-  } catch (error) {
-    console.error('Error getting sound files:', error)
-    return []
-  }
-}
-
 // Function to get a random sound file
 function getRandomSound(isPriority: boolean): string | null {
   try {
@@ -50,6 +35,43 @@ function getRandomSound(isPriority: boolean): string | null {
   } catch (error) {
     console.error('Error getting sound files:', error)
     return null
+  }
+}
+
+// Sound effects for the app
+let audioContext: AudioContext | null = null
+
+const initAudioContext = () => {
+  if (!audioContext) {
+    audioContext = new AudioContext()
+  }
+  return audioContext
+}
+
+// Play a sound from the general folder
+export const playGeneralSound = async () => {
+  try {
+    const soundPath = getRandomSound(false)
+    if (!soundPath) {
+      console.error('No sound file available')
+      return
+    }
+
+    const context = initAudioContext()
+    console.log('Loading sound from:', soundPath)
+    const response = await fetch(soundPath)
+    if (!response.ok) {
+      throw new Error(`Failed to load sound: ${response.status} ${response.statusText}`)
+    }
+    const arrayBuffer = await response.arrayBuffer()
+    const audioBuffer = await context.decodeAudioData(arrayBuffer)
+    const source = context.createBufferSource()
+    source.buffer = audioBuffer
+    source.connect(context.destination)
+    source.start(0)
+    console.log('Sound played successfully')
+  } catch (error) {
+    console.error('Failed to play sound:', error)
   }
 }
 

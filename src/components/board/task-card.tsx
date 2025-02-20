@@ -113,9 +113,9 @@ export function TaskCard({ task, index, onDelete, onUpdate, onAddComment }: Task
           )}
           {showEdit && (
             <TaskDialog
-              task={task}
               open={showEdit}
               onOpenChange={setShowEdit}
+              task={task}
               onSave={(updates) => {
                 if (onUpdate) {
                   onUpdate(task.id, updates)
